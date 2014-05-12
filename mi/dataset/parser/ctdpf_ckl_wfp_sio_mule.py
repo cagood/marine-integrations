@@ -145,7 +145,7 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
         self._metadataSent = False
         self._decimationFactorPresent = False
         self._dataLength = 0
-        self._startIndex = 34
+        self._startIndex = HEADER_BYTES + 1
         self._endIndex = 0
         self._goodHeader = False
         self._goodFooter = False
@@ -192,9 +192,8 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
             self._startData = match.end(0)
             self._goodHeader = True
         else:
-            raise SampleException("Header record is badly formed - unable to parse file")
-
-        return self._goodHeader
+            self._goodHeader = False
+            log.warning('CTDPF_CKL_SIO_MULE: Bad header detected, cannot parse file')
 
     def process_footer(self, chunk):
         """
@@ -221,17 +220,18 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
             self._goodFooter = True
             log.debug('PROCESS_FOOTER: NO decimation factor found')
         else:
-            raise SampleException("Footer record is badly formed - unable to parse file")
+            self._goodFooter = False
+            log.warning('CTDPF_CKL_SIO_MULE: Bad footer detected, cannot parse file')
 
-        timefields = struct.unpack('>II', final_match.group(2))
-        self._startTime = int(timefields[0])
-        self._endTime = int(timefields[1])
-        if self._numberOfRecords > 0:
-            self._timeIncrement = float(self._endTime - self._startTime) / float(self._numberOfRecords)
-        else:
-            raise SampleException("Input data stream is empty - unable to parse file")
-
-        return self._goodFooter
+        if self._goodFooter:
+            timefields = struct.unpack('>II', final_match.group(2))
+            self._startTime = int(timefields[0])
+            self._endTime = int(timefields[1])
+            if self._numberOfRecords > 0:
+                self._timeIncrement = float(self._endTime - self._startTime) / float(self._numberOfRecords)
+            else:
+                self._goodFooter = False
+                log.warning('CTDPF_CKL_SIO_MULE: Bad footer detected, cannot parse file')
 
     # Overrides the parse_chunks routine in SioMuleCommon
     # What I will receive here is an entire SIO "chunk" \x01 - \x03
@@ -256,29 +256,29 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
             sample = self.extract_metadata_particle(self._footerData, timestamp)
             result_particles.append(sample)
 
-        moreRecords = True
-        dataRecord = chunk[self._startData:self._startData + DATA_RECORD_BYTES]
-        self._startData += DATA_RECORD_BYTES
-        self._recordNumber = 0.0
-        timestamp = float(ntplib.system_to_ntp_time(float(self._startTime) +
-                                                        (self._recordNumber * self._timeIncrement)))
-
-        while moreRecords:
-            dataFields = struct.unpack('>I', '\x00' + dataRecord[0:3]) + \
-                         struct.unpack('>I', '\x00' + dataRecord[3:6]) + \
-                         struct.unpack('>I', '\x00' + dataRecord[6:9]) + \
-                         struct.unpack('>H', dataRecord[9:11])
-            self._RecordData = (dataFields[0], dataFields[1], dataFields[2])
-            sample = self.extract_data_particle(self._RecordData, timestamp)
-            result_particles.append(sample)
+            moreRecords = True
             dataRecord = chunk[self._startData:self._startData + DATA_RECORD_BYTES]
-            self._recordNumber += 1.0
+            self._startData += DATA_RECORD_BYTES
+            self._recordNumber = 0.0
             timestamp = float(ntplib.system_to_ntp_time(float(self._startTime) +
                                                         (self._recordNumber * self._timeIncrement)))
-            eopMatch = EOP_MATCHER.search(dataRecord)
-            if eopMatch:
-                moreRecords = False
-            else:
-                self._startData += DATA_RECORD_BYTES
+
+            while moreRecords:
+                dataFields = struct.unpack('>I', '\x00' + dataRecord[0:3]) + \
+                             struct.unpack('>I', '\x00' + dataRecord[3:6]) + \
+                             struct.unpack('>I', '\x00' + dataRecord[6:9]) + \
+                             struct.unpack('>H', dataRecord[9:11])
+                self._RecordData = (dataFields[0], dataFields[1], dataFields[2])
+                sample = self.extract_data_particle(self._RecordData, timestamp)
+                result_particles.append(sample)
+                dataRecord = chunk[self._startData:self._startData + DATA_RECORD_BYTES]
+                self._recordNumber += 1.0
+                timestamp = float(ntplib.system_to_ntp_time(float(self._startTime) +
+                                                            (self._recordNumber * self._timeIncrement)))
+                eopMatch = EOP_MATCHER.search(dataRecord)
+                if eopMatch:
+                    moreRecords = False
+                else:
+                    self._startData += DATA_RECORD_BYTES
 
         return result_particles
