@@ -245,7 +245,10 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
 
         (timestamp, chunk) = self._chunker.get_next_data()
 
-        self.process_header(chunk)
+        if chunk:
+            self.process_header(chunk)
+        else:
+            log.warning('No chunk received from self._chunker.get_next_data')
 
         if self._goodHeader:
             self.process_footer(chunk)
@@ -263,7 +266,9 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
             timestamp = float(ntplib.system_to_ntp_time(float(self._startTime) +
                                                         (self._recordNumber * self._timeIncrement)))
 
+            recordNumber = 0
             while moreRecords:
+                recordNumber += 1
                 dataFields = struct.unpack('>I', '\x00' + dataRecord[0:3]) + \
                              struct.unpack('>I', '\x00' + dataRecord[3:6]) + \
                              struct.unpack('>I', '\x00' + dataRecord[6:9]) + \
