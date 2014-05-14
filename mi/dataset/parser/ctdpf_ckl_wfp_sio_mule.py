@@ -143,7 +143,6 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
                                                        publish_callback,
                                                        exception_callback)
         self._metadataSent = False
-        self._decimationFactorPresent = False
         self._dataLength = 0
         self._startIndex = HEADER_BYTES + 1
         self._endIndex = 0
@@ -207,7 +206,7 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
         final_match = deci_match
         if deci_match:
             self._numberOfRecords = ((self._dataLength + 1) - FOOTER_BYTES) / 11
-            self._decimationFactor = final_match.group(3)
+            self._decimationFactor = struct.unpack('>H', final_match.group(3))[0]
             self._goodFooter = True
             log.debug('PROCESS_FOOTER: Decimation factor found')
         elif std_match:
@@ -255,7 +254,9 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
 
         if self._goodFooter:
             timestamp = float(ntplib.system_to_ntp_time(self._startTime))
+            log.debug('RAW DATA %s',self._footerData)
             self._footerData = (self._startTime, self._endTime, self._numberOfRecords, self._decimationFactor)
+            log.debug('RAW DATA %s',self._footerData)
             sample = self.extract_metadata_particle(self._footerData, timestamp)
             result_particles.append(sample)
 
