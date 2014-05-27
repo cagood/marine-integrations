@@ -9,6 +9,7 @@
 import os
 import struct
 import ntplib
+import inspect
 from StringIO import StringIO
 
 from nose.plugins.attrib import attr
@@ -26,12 +27,12 @@ from mi.dataset.parser.ctdpf_ckl_wfp_sio_mule import CtdpfCklWfpSioMuleDataParti
 # Data stream which contains a decimation factor
 TEST_DATA_wdf = b'\x01\x57\x43\x31\x32\x33\x36\x38\x32\x30\x5f' + \
                  '\x30\x30\x33\x36\x48\x35\x31\x46\x32\x35\x42' + \
-                 '\x44\x43\x5f\x31\x34\x5f\x35\x45\x34\x36\x02' + \
+                 '\x44\x43\x5f\x31\x34\x5f\x37\x36\x33\x44\x02' + \
                  '\x00\x1a\x88\x03\xe3\x3b\x00\x03\xeb\x0a\xc8' + \
                  '\x00\x1a\x8c\x03\xe2\xc0\x00\x03\xeb\x0a\x81' + \
                  '\x00\x1a\x90\x03\xe1\x5b\x00\x03\xeb\x0a\x65' + \
                  '\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff' + \
-                 '\x52\x4e\x75\x82\x52\x4e\x76\x9a\x30\x30\x03'
+                 '\x52\x4e\x75\x82\x52\x4e\x76\x9a\x00\x0A\x03'
 
 # Data stream which does not contain a decimation factor
 TEST_DATA_ndf = b'\x01\x57\x43\x31\x32\x33\x36\x38\x32\x30\x5f' + \
@@ -107,8 +108,18 @@ TEST_DATA_wts = b'\x01\x57\x43\x31\x32\x33\x36\x38\x32\x30\x5f' + \
                  '\xff\xff\xff\xff\xff\xff\xff\xff\xff\x52\x4e' + \
                  '\x75\x82\x52\x4e\x76\x9a\x03'
 
+# Data stream which contains the wrong header
+TEST_DATA_wwh = b'\x01\x57\x41\x31\x32\x33\x36\x38\x32\x30\x5f' + \
+                 '\x30\x30\x33\x34\x48\x35\x31\x46\x32\x35\x42' + \
+                 '\x44\x43\x5f\x31\x34\x5f\x39\x41\x32\x38\x02' + \
+                 '\x00\x1a\x88\x03\xe3\x3b\x00\x03\xeb\x0a\xc8' + \
+                 '\x00\x1a\x8c\x03\xe2\xc0\x00\x03\xeb\x0a\x81' + \
+                 '\x00\x1a\x90\x03\xe1\x5b\x00\x03\xeb\x0a\x65' + \
+                 '\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff' + \
+                 '\x52\x4e\x75\x82\x52\x4e\x76\x9a\x03'
+
 # Actual data contained in the data streams above
-EXPECTED_TIME_STAMP = (1380873602, 1380873882, 3.0, '00')
+EXPECTED_TIME_STAMP = (1380873602, 1380873882, 3.0, 10)
 EXPECTED_TIME_STAMP_ndf = (1380873602, 1380873882, 3.0, 0)
 
 EXPECTED_VALUES_1 = (6792, 254779, 1003)
@@ -360,3 +371,19 @@ class CtdpfCklWfpSioMuleParserUnitTestCase(ParserUnitTestCase):
             log.debug('CAG TEST: FAILED TO DETECT FILE IS TOO SHORT CASE')
         else:
             log.debug('CAG TEST: FILE IS TOO SHORT DETECTED')
+
+    def test_simple_with_wrong_header(self):
+        """
+        Read test data. Should detect that the input stream ?????
+        Data stream should be rejected.
+        """
+        log.debug('CAG TEST: FILE HAS THE WRONG HEADER')
+        stream_handle = StringIO(TEST_DATA_wwh)
+        self.parser =  CtdpfCklWfpSioMuleParser(self.config, None, stream_handle,
+                                                self.state_callback, self.pub_callback, self.exception_callback)
+        # next get records
+        result = self.parser.get_records(1)
+        if result:
+            log.debug('CAG TEST: FAILED TO DETECT WRONG HEADER')
+        else:
+            log.debug('CAG TEST: WRONG HEADER DETECTED')

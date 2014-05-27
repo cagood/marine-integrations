@@ -192,7 +192,7 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
             self._goodHeader = True
         else:
             self._goodHeader = False
-            log.warning('CTDPF_CKL_SIO_MULE: Bad header detected, cannot parse file')
+            log.warning('CTDPF_CKL_SIO_MULE: Incorrect header detected, cannot parse file')
 
     def process_footer(self, chunk):
         """
@@ -251,6 +251,9 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
 
         if self._goodHeader:
             self.process_footer(chunk)
+        else:
+            self._goodFooter = False
+            self._chunk_sample_count.append(0)
 
         if self._goodFooter:
             timestamp = float(ntplib.system_to_ntp_time(self._startTime))
@@ -267,9 +270,9 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
             timestamp = float(ntplib.system_to_ntp_time(float(self._startTime) +
                                                         (self._recordNumber * self._timeIncrement)))
 
-            recordNumber = 0
+            sample_count = 0
             while moreRecords:
-                recordNumber += 1
+                sample_count += 1
                 dataFields = struct.unpack('>I', '\x00' + dataRecord[0:3]) + \
                              struct.unpack('>I', '\x00' + dataRecord[3:6]) + \
                              struct.unpack('>I', '\x00' + dataRecord[6:9]) + \
@@ -277,6 +280,7 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
                 self._RecordData = (dataFields[0], dataFields[1], dataFields[2])
                 sample = self.extract_data_particle(self._RecordData, timestamp)
                 result_particles.append(sample)
+                self._chunk_sample_count.append(sample_count)
                 dataRecord = chunk[self._startData:self._startData + DATA_RECORD_BYTES]
                 self._recordNumber += 1.0
                 timestamp = float(ntplib.system_to_ntp_time(float(self._startTime) +
