@@ -23,7 +23,7 @@ from mi.core.common import BaseEnum
 from mi.core.instrument.data_particle import DataParticle, DataParticleKey
 from mi.core.exceptions import SampleException
 from mi.dataset.parser.sio_mule_common import SioMuleParser
-
+from mi.core.exceptions import UnexpectedDataException
 
 DATA_RECORD_BYTES = 11  # Number of bytes in a WC-type file
 TIME_RECORD_BYTES = 8   # Two four byte timestamps
@@ -232,8 +232,19 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
                 self._goodFooter = False
                 log.warning('CTDPF_CKL_SIO_MULE: Bad footer detected, cannot parse file')
 
+    def handle_non_data(self, non_data, non_end, start):
+        """
+        Handle any non-data that is found in the file
+        """
+        # if non-data is expected, handle it here, otherwise it is an error
+        if non_data is not None and non_end <= start:
+            # if this non-data is an error, send an UnexpectedDataException and increment the state
+            self._increment_state(len(non_data))
+            # if non-data is a fatal error, directly call the exception, if it is not use the _exception_callback
+            self._exception_callback(UnexpectedDataException(
+                "Found %d bytes of un-expected non-data %s" % (len(non_data), non_data)))
+
     # Overrides the parse_chunks routine in SioMuleCommon
-    # What I will receive here is an entire SIO "chunk" \x01 - \x03
     def parse_chunks(self):
         """
         Parse out any pending data chunks in the chunker. If it is a valid data piece, build a particle,
@@ -241,54 +252,59 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
         @retval a list of tuples
         """
         result_particles = []
+        (nd_timestamp, non_data, non_start, non_end) = self._chunker.get_next_non_data_with_index(clean=False)
+        (timestamp, chunk, start, end) = self._chunker.get_next_data_with_index(clean=True)
+        self.handle_non_data(non_data, non_end, start)
 
-        (timestamp, chunk) = self._chunker.get_next_data()
-
-        if chunk:
-            self.process_header(chunk)
-        else:
-            log.warning('No chunk received from self._chunker.get_next_data')
-
-        if self._goodHeader:
-            self.process_footer(chunk)
-        else:
-            self._goodFooter = False
-            self._chunk_sample_count.append(0)
-
-        if self._goodFooter:
-            timestamp = float(ntplib.system_to_ntp_time(self._startTime))
-            log.debug('RAW DATA %s',self._footerData)
-            self._footerData = (self._startTime, self._endTime, self._numberOfRecords, self._decimationFactor)
-            log.debug('RAW DATA %s',self._footerData)
-            sample = self.extract_metadata_particle(self._footerData, timestamp)
-            result_particles.append(sample)
-
-            moreRecords = True
-            dataRecord = chunk[self._startData:self._startData + DATA_RECORD_BYTES]
-            self._startData += DATA_RECORD_BYTES
-            self._recordNumber = 0.0
-            timestamp = float(ntplib.system_to_ntp_time(float(self._startTime) +
-                                                        (self._recordNumber * self._timeIncrement)))
-
+        while chunk is not None:
             sample_count = 0
-            while moreRecords:
-                sample_count += 1
-                dataFields = struct.unpack('>I', '\x00' + dataRecord[0:3]) + \
-                             struct.unpack('>I', '\x00' + dataRecord[3:6]) + \
-                             struct.unpack('>I', '\x00' + dataRecord[6:9]) + \
-                             struct.unpack('>H', dataRecord[9:11])
-                self._RecordData = (dataFields[0], dataFields[1], dataFields[2])
-                sample = self.extract_data_particle(self._RecordData, timestamp)
+
+            self.process_header(chunk)
+
+            if self._goodHeader:
+                self.process_footer(chunk)
+            else:
+                self._goodFooter = False
+                self._chunk_sample_count.append(0)
+                chunk = None
+
+            if self._goodFooter:
+                timestamp = float(ntplib.system_to_ntp_time(self._startTime))
+                log.debug('RAW DATA %s',self._footerData)
+                self._footerData = (self._startTime, self._endTime, self._numberOfRecords, self._decimationFactor)
+                log.debug('RAW DATA %s',self._footerData)
+                sample = self.extract_metadata_particle(self._footerData, timestamp)
                 result_particles.append(sample)
-                self._chunk_sample_count.append(sample_count)
+
+                moreRecords = True
                 dataRecord = chunk[self._startData:self._startData + DATA_RECORD_BYTES]
-                self._recordNumber += 1.0
+                self._startData += DATA_RECORD_BYTES
+                self._recordNumber = 0.0
                 timestamp = float(ntplib.system_to_ntp_time(float(self._startTime) +
                                                             (self._recordNumber * self._timeIncrement)))
-                eopMatch = EOP_MATCHER.search(dataRecord)
-                if eopMatch:
-                    moreRecords = False
-                else:
-                    self._startData += DATA_RECORD_BYTES
+
+                while moreRecords:
+                    sample_count += 1
+                    dataFields = struct.unpack('>I', '\x00' + dataRecord[0:3]) + \
+                                 struct.unpack('>I', '\x00' + dataRecord[3:6]) + \
+                                 struct.unpack('>I', '\x00' + dataRecord[6:9]) + \
+                                 struct.unpack('>H', dataRecord[9:11])
+                    self._RecordData = (dataFields[0], dataFields[1], dataFields[2])
+                    sample = self.extract_data_particle(self._RecordData, timestamp)
+                    result_particles.append(sample)
+                    self._chunk_sample_count.append(sample_count)
+                    dataRecord = chunk[self._startData:self._startData + DATA_RECORD_BYTES]
+                    self._recordNumber += 1.0
+                    timestamp = float(ntplib.system_to_ntp_time(float(self._startTime) +
+                                                                (self._recordNumber * self._timeIncrement)))
+                    eopMatch = EOP_MATCHER.search(dataRecord)
+                    if eopMatch:
+                        moreRecords = False
+                    else:
+                        self._startData += DATA_RECORD_BYTES
+
+            (nd_timestamp, non_data, non_start, non_end) = self._chunker.get_next_non_data_with_index(clean=False)
+            (timestamp, chunk, start, end) = self._chunker.get_next_data_with_index(clean=True)
+            self.handle_non_data(non_data, non_end, start)
 
         return result_particles
