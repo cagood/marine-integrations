@@ -182,6 +182,7 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
         @retval True (good header), False (bad header)
         """
         header = chunk[0:HEADER_BYTES]
+        log.debug('HEADER %s', header)
         match = WC_HEADER_MATCHER.search(header)
         if match:
             log.debug('Header is good')
@@ -232,18 +233,6 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
                 self._goodFooter = False
                 log.warning('CTDPF_CKL_SIO_MULE: Bad footer detected, cannot parse file')
 
-    def handle_non_data(self, non_data, non_end, start):
-        """
-        Handle any non-data that is found in the file
-        """
-        # if non-data is expected, handle it here, otherwise it is an error
-        if non_data is not None and non_end <= start:
-            # if this non-data is an error, send an UnexpectedDataException and increment the state
-            self._increment_state(len(non_data))
-            # if non-data is a fatal error, directly call the exception, if it is not use the _exception_callback
-            self._exception_callback(UnexpectedDataException(
-                "Found %d bytes of un-expected non-data %s" % (len(non_data), non_data)))
-
     # Overrides the parse_chunks routine in SioMuleCommon
     def parse_chunks(self):
         """
@@ -252,9 +241,7 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
         @retval a list of tuples
         """
         result_particles = []
-        (nd_timestamp, non_data, non_start, non_end) = self._chunker.get_next_non_data_with_index(clean=False)
         (timestamp, chunk, start, end) = self._chunker.get_next_data_with_index(clean=True)
-        self.handle_non_data(non_data, non_end, start)
 
         while chunk is not None:
             sample_count = 0
@@ -270,9 +257,8 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
 
             if self._goodFooter:
                 timestamp = float(ntplib.system_to_ntp_time(self._startTime))
-                log.debug('RAW DATA %s',self._footerData)
                 self._footerData = (self._startTime, self._endTime, self._numberOfRecords, self._decimationFactor)
-                log.debug('RAW DATA %s',self._footerData)
+                log.debug('FOOTER %s',self._footerData)
                 sample = self.extract_metadata_particle(self._footerData, timestamp)
                 result_particles.append(sample)
 
@@ -303,8 +289,6 @@ class CtdpfCklWfpSioMuleParser(SioMuleParser):
                     else:
                         self._startData += DATA_RECORD_BYTES
 
-            (nd_timestamp, non_data, non_start, non_end) = self._chunker.get_next_non_data_with_index(clean=False)
             (timestamp, chunk, start, end) = self._chunker.get_next_data_with_index(clean=True)
-            self.handle_non_data(non_data, non_end, start)
 
         return result_particles
