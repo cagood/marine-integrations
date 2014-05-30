@@ -31,13 +31,13 @@ class DataParticleType(BaseEnum):
     METADATA = 'ctdpf_ckl_wfp_metadata'
 
 
-class CtdpfCklWfpParserDataParticleKey(BaseEnum):
+class CtdpfCklWfpDataParticleKey(BaseEnum):
     CONDUCTIVITY = 'conductivity'
     TEMPERATURE = 'temperature'
     PRESSURE = 'pressure'
 
 
-class CtdpfCklWfpParserDataParticle(DataParticle):
+class CtdpfCklWfpDataParticle(DataParticle):
     """
     Class for parsing data from the ctdpf_ckl_wfp data set
     """
@@ -52,21 +52,21 @@ class CtdpfCklWfpParserDataParticle(DataParticle):
         @throws SampleException If there is a problem with sample creation
         """
         if len(self.raw_data) != DATA_RECORD_BYTES:
-            raise SampleException("CtdpfCklWfpParserDataParticle: Received unexpected number of bytes %d"
+            raise SampleException("CtdpfCklWfpDataParticle: Received unexpected number of bytes %d"
                                   % len(self.raw_data))
 
         fields = struct.unpack('>I', '\x00' + self.raw_data[0:3]) + \
                  struct.unpack('>I', '\x00' + self.raw_data[3:6]) + \
                  struct.unpack('>I', '\x00' + self.raw_data[6:9])
 
-        result = [self._encode_value(CtdpfCklWfpParserDataParticleKey.CONDUCTIVITY, fields[0], int),
-                  self._encode_value(CtdpfCklWfpParserDataParticleKey.TEMPERATURE, fields[1], int),
-                  self._encode_value(CtdpfCklWfpParserDataParticleKey.PRESSURE, fields[2], int)]
+        result = [self._encode_value(CtdpfCklWfpDataParticleKey.CONDUCTIVITY, fields[0], int),
+                  self._encode_value(CtdpfCklWfpDataParticleKey.TEMPERATURE, fields[1], int),
+                  self._encode_value(CtdpfCklWfpDataParticleKey.PRESSURE, fields[2], int)]
 
         return result
 
 
-class CtdpfCklWfpMetadataParserDataParticle(DataParticle):
+class CtdpfCklWfpMetadataParticle(DataParticle):
     """
     Class for creating the data particle for the common wfp metadata
     """
@@ -80,7 +80,7 @@ class CtdpfCklWfpMetadataParserDataParticle(DataParticle):
         @throws SampleException If there is a problem with sample creation
         """
         if len(self.raw_data[0]) != TIME_RECORD_BYTES:
-            raise SampleException("CtdpfCklWfpMetadataDataParserDataParticle: Received unexpected number of bytes %d" % len(self.raw_data[0]))
+            raise SampleException("CtdpfCklWfpMetadataDataParticle: Received unexpected number of bytes %d" % len(self.raw_data[0]))
         # data is passed in as a tuple, first element is the two timestamps as a binary string
         # the second is the number of samples as an float
         timefields = struct.unpack('>II', self.raw_data[0])
@@ -105,7 +105,7 @@ class CtdpfCklWfpParser(WfpCFileCommonParser):
         @param raw_data raw data to parse, in this case a tuple of the time string to parse and the number of records
         @param timestamp timestamp in NTP64
         """
-        sample = self._extract_sample(CtdpfCklWfpMetadataParserDataParticle, None,
+        sample = self._extract_sample(CtdpfCklWfpMetadataParticle, None,
                                      raw_data, timestamp)
         return sample
 
@@ -115,5 +115,5 @@ class CtdpfCklWfpParser(WfpCFileCommonParser):
         @param raw_data the raw data to parse
         @param timestamp the timestamp in NTP64
         """
-        sample = self._extract_sample(CtdpfCklWfpParserDataParticle, None, raw_data, timestamp)
+        sample = self._extract_sample(CtdpfCklWfpDataParticle, None, raw_data, timestamp)
         return sample

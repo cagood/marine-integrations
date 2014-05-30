@@ -32,7 +32,7 @@ from mi.idk.dataset.unit_test import DataSetQualificationTestCase
 from mi.dataset.dataset_driver import DriverParameter
 from mi.dataset.dataset_driver import DataSourceConfigKey, DataSetDriverConfigKeys
 from mi.dataset.driver.ctdpf_ckl.wfp.driver import CtdpfCklWfpDataSetDriver
-from mi.dataset.parser.ctdpf_ckl_wfp import CtdpfCklWfpParserDataParticle, DataParticleType
+from mi.dataset.parser.ctdpf_ckl_wfp import CtdpfCklWfpDataParticle, DataParticleType
 from mi.dataset.parser.wfp_c_file_common import StateKey
 
 # Fill in driver details

@@ -19,16 +19,16 @@ from mi.core.log import get_logger ; log = get_logger()
 from mi.core.exceptions import SampleException
 
 from mi.dataset.dataset_driver import SimpleDataSetDriver, DataSetDriverConfigKeys, DriverStateKey
-from mi.dataset.parser.ctdpf_ckl_wfp import CtdpfCklWfpParser, CtdpfCklWfpParserDataParticle
-from mi.dataset.parser.ctdpf_ckl_wfp import CtdpfCklWfpMetadataParserDataParticle
+from mi.dataset.parser.ctdpf_ckl_wfp import CtdpfCklWfpParser, CtdpfCklWfpDataParticle
+from mi.dataset.parser.ctdpf_ckl_wfp import CtdpfCklWfpMetadataParticle
 from mi.dataset.harvester import SingleDirectoryHarvester
 
 class CtdpfCklWfpDataSetDriver(SimpleDataSetDriver):
     
     @classmethod
     def stream_config(cls):
-        return [CtdpfCklWfpMetadataParserDataParticle.type(),
-                CtdpfCklWfpParserDataParticle.type()]
+        return [CtdpfCklWfpMetadataParticle.type(),
+                CtdpfCklWfpDataParticle.type()]
 
     def _build_parser(self, parser_state, infile, filesize):
         """
@@ -37,8 +37,8 @@ class CtdpfCklWfpDataSetDriver(SimpleDataSetDriver):
         config = self._parser_config
         config.update({
             'particle_module': 'mi.dataset.parser.ctdpf_ckl_wfp',
-            'particle_class': ['CtdpfCklWfpMetadataParserDataParticle',
-                               'CtdpfCklWfpParserDataParticle']
+            'particle_class': ['CtdpfCklWfpMetadataParticle',
+                               'CtdpfCklWfpDataParticle']
         })
         log.debug("My Config: %s", config)
         self._parser = CtdpfCklWfpParser(
