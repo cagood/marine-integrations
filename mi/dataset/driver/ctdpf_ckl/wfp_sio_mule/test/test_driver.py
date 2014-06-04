@@ -136,7 +136,7 @@ class IntegrationTest(DataSetIntegrationTestCase):
 
         self.clear_async_data()
         self.create_sample_data_set_dir('BIG_GIANT_HEAD.dat', DIR_WFP_SIO_MULE, 'node58p1.dat')
-        self.assert_data(SIO_PARTICLES, 'BIG_GIANT_HEAD.yml', count=42062, timeout=1200)
+        self.assert_data(SIO_PARTICLES, 'BIG_GIANT_HEAD.yml', count=42062, timeout=1500)
 
         self.driver.stop_sampling()
 
@@ -160,7 +160,7 @@ class QualificationTest(DataSetQualificationTestCase):
         Setup an agent/driver/harvester/parser and verify that data is
         published out the agent
         """
-        self.create_sample_data('first.DAT', 'C0000001.DAT')
+        self.create_sample_data_set_dir('WC_ONE.DAT', DIR_WFP_SIO_MULE, 'node58p1.dat')
         self.assert_initialize(final_state=ResourceAgentState.COMMAND)
 
         # NOTE: If the processing is not slowed down here, the engineering samples are
@@ -168,87 +168,72 @@ class QualificationTest(DataSetQualificationTestCase):
         self.dataset_agent_client.set_resource({DriverParameter.RECORDS_PER_SECOND: 1})
         self.assert_start_sampling()
 
-        # Verify we get one sample
+        # Verify we get samples
         try:
             result = self.data_subscribers.get_samples(DataParticleType.METADATA, 1)
-            log.debug("First RESULT: %s", result)
+            log.debug("METADATA RESULT: %s", result)
 
-            result_2 = self.data_subscribers.get_samples(DataParticleType.DATA, 3)
-            log.debug("Second RESULT: %s", result_2)
+            result_2 = self.data_subscribers.get_samples(DataParticleType.DATA, 95, 1200)
+            log.debug("DATA RESULT: %s", result_2)
 
             result.extend(result_2)
-            log.debug("Extended RESULT: %s", result)
+            log.debug("COMBINED RESULT: %s", result)
 
             # Verify values
-            self.assert_data_values(result, 'first.result.yml')
+            self.assert_data_values(result, 'WC_ONE.yml')
         except Exception as e:
             log.error("Exception trapped: %s", e)
             self.fail("Sample timeout.")
 
-    def test_large_import(self):
+    def test_large_publish_path(self):
         """
-        Test importing a large number of samples from the file at once
+        Setup an agent/driver/harvester/parser and verify that data is
+        published out the agent using a file with real data
         """
-        self.create_sample_data('C0000038.DAT')
-        self.assert_initialize()
-
-        # get results for each of the data particle streams
-        result1 = self.get_samples(DataParticleType.METADATA,1,10)
-        result2 = self.get_samples(DataParticleType.DATA,270,40)
-
-    def test_stop_start(self):
-        """
-        Test the agents ability to start data flowing, stop, then restart
-        at the correct spot.
-        """
-        log.info("CONFIG: %s", self._agent_config())
-        self.create_sample_data('first.DAT', "C0000001.DAT")
-
+        self.create_sample_data_set_dir('BIG_GIANT_HEAD.dat', DIR_WFP_SIO_MULE, 'node58p1.dat')
         self.assert_initialize(final_state=ResourceAgentState.COMMAND)
 
-        # Slow down processing to 1 per second to give us time to stop
+        # NOTE: If the processing is not slowed down here, the engineering samples are
+        # returned in the wrong order
         self.dataset_agent_client.set_resource({DriverParameter.RECORDS_PER_SECOND: 1})
         self.assert_start_sampling()
 
+        # Verify we get samples
         try:
-            # Read the first file and verify the data
-            result = self.get_samples(DataParticleType.METADATA)
-            result2 = self.get_samples(DataParticleType.DATA, 3)
-            result.extend(result2)
-            log.debug("RESULT: %s", result)
+
+            result = self.data_subscribers.get_samples(DataParticleType.METADATA, 1, 1200)
+            result_1b = self.data_subscribers.get_samples(DataParticleType.DATA, 14, 1200)
+            result.extend(result_1b)
+
+            result_2a = self.data_subscribers.get_samples(DataParticleType.METADATA, 1, 1200)
+            result_2b = self.data_subscribers.get_samples(DataParticleType.DATA, 74, 1200)
+            result.extend(result_2a)
+            result.extend(result_2b)
+
+            result_3a = self.data_subscribers.get_samples(DataParticleType.METADATA, 1, 1200)
+            result_3b = self.data_subscribers.get_samples(DataParticleType.DATA, 95, 1200)
+            result.extend(result_3a)
+            result.extend(result_3b)
+
+            result_4a = self.data_subscribers.get_samples(DataParticleType.METADATA, 1, 1200)
+            result_4b = self.data_subscribers.get_samples(DataParticleType.DATA, 102, 1200)
+            result.extend(result_4a)
+            result.extend(result_4b)
 
             # Verify values
-            self.assert_data_values(result, 'first.result.yml')
-            self.assert_all_queue_empty()
+            self.assert_data_values(result, 'miniBGH.yml')
 
-            self.create_sample_data('second.DAT', "C0000002.DAT")
-            # Now read the first three records (1 metadata, 2 data) of the second file then stop
-            result = self.get_samples(DataParticleType.METADATA)
-            result2 = self.get_samples(DataParticleType.DATA, 2)
-            result.extend(result2)
-            log.debug("got result 1 %s", result)
-            self.assert_stop_sampling()
-            self.assert_all_queue_empty()
-
-            # Restart sampling and ensure we get the last 4 records of the file
-            self.assert_start_sampling()
-            result3 = self.get_samples(DataParticleType.DATA, 4)
-            log.debug("got result 2 %s", result3)
-            result.extend(result3)
-            self.assert_data_values(result, 'second.result.yml')
-
-            self.assert_all_queue_empty()
-        except SampleTimeout as e:
-            log.error("Exception trapped: %s", e, exc_info=True)
+        except Exception as e:
+            log.error("Exception trapped: %s", e)
             self.fail("Sample timeout.")
 
-    def test_shutdown_restart(self):
+    def test_stop_restart(self):
         """
         Test a full stop of the dataset agent, then restart the agent
         and confirm it restarts at the correct spot.
         """
         log.info("CONFIG: %s", self._agent_config())
-        self.create_sample_data('first.DAT', "C0000001.DAT")
+        self.create_sample_data_set_dir('WC_TWO.DAT', DIR_WFP_SIO_MULE, 'node58p1.dat')
 
         self.assert_initialize(final_state=ResourceAgentState.COMMAND)
 
@@ -257,62 +242,54 @@ class QualificationTest(DataSetQualificationTestCase):
         self.assert_start_sampling()
 
         try:
-            # Read the first file and verify the data
-            result = self.get_samples(DataParticleType.METADATA)
-            result2 = self.get_samples(DataParticleType.DATA, 3)
-            result.extend(result2)
-            log.debug("RESULT: %s", result)
-
-            # Verify values
-            self.assert_data_values(result, 'first.result.yml')
-            self.assert_all_queue_empty()
-
-            self.create_sample_data('second.DAT', "C0000002.DAT")
-            # Now read the first three records (1 metadata, 2 data) of the second file then stop
-            result = self.get_samples(DataParticleType.METADATA)
-            result2 = self.get_samples(DataParticleType.DATA, 2)
+            # Read the first 98 records in the file then stop
+            result = self.get_samples(DataParticleType.METADATA, 1, 1200)
+            result2 = self.get_samples(DataParticleType.DATA, 98, 1200)
             result.extend(result2)
             log.debug("got result 1 %s", result)
+
+            #Reload the file (make the system think it's a new file)
+            self.create_sample_data_set_dir('WC_TWO.DAT', DIR_WFP_SIO_MULE, 'node58p1.dat')
+
+            # Now read the last 4 records of the second file then stop
+            result2 = self.get_samples(DataParticleType.DATA, 4, 1200)
+            result.extend(result2)
+            log.debug("got result 2 %s", result)
             self.assert_stop_sampling()
             self.assert_all_queue_empty()
 
-            # stop the agent
-            self.stop_dataset_agent_client()
-            # re-start the agent
-            self.init_dataset_agent_client()
-            #re-initialize
-            self.assert_initialize(final_state=ResourceAgentState.COMMAND)
-
-            # Restart sampling and ensure we get the last 4 records of the file
-            self.assert_start_sampling()
-            result3 = self.get_samples(DataParticleType.DATA, 4)
-            log.debug("got result 2 %s", result3)
-            result.extend(result3)
-            self.assert_data_values(result, 'second.result.yml')
+            # Check that the values match
+            self.assert_data_values(result, 'WC_TWO.yml')
 
             self.assert_all_queue_empty()
+
         except SampleTimeout as e:
             log.error("Exception trapped: %s", e, exc_info=True)
             self.fail("Sample timeout.")
 
-    def test_parser_exception(self):
+    def test_two_streams(self):
         """
-        Test an exception is raised after the driver is started during
-        record parsing.
+        Setup an agent/driver/harvester/parser and verify that data is
+        published out the agent using a file with real data
         """
-        self.clear_sample_data()
-        self.create_sample_data('bad_num_samples.DAT', 'C0000001.DAT')
-        self.create_sample_data('first.DAT', 'C0000002.DAT')
+        self.create_sample_data_set_dir('BIG_GIANT_HEAD.dat', DIR_WFP_SIO_MULE, 'node58p1.dat')
+        self.assert_initialize(final_state=ResourceAgentState.COMMAND)
 
-        self.assert_initialize()
+        # NOTE: If the processing is not slowed down here, the engineering samples are
+        # returned in the wrong order
+        self.dataset_agent_client.set_resource({DriverParameter.RECORDS_PER_SECOND: 1})
+        self.assert_start_sampling()
 
-        self.event_subscribers.clear_events()
-        result = self.get_samples(DataParticleType.METADATA)
-        result1 = self.get_samples(DataParticleType.DATA, 3)
-        result.extend(result1)
-        self.assert_data_values(result, 'first.result.yml')
-        self.assert_all_queue_empty();
+        # Verify we get samples
+        try:
 
-        # Verify an event was raised and we are in our retry state
-        self.assert_event_received(ResourceAgentErrorEvent, 10)
-        self.assert_state_change(ResourceAgentState.STREAMING, 10)
+            result = self.data_subscribers.get_samples(DataParticleType.METADATA, 4, 1200)
+            result_1b = self.data_subscribers.get_samples(DataParticleType.DATA, 285, 2400)
+            result.extend(result_1b)
+
+            # Verify values
+            self.assert_data_values(result, 'jumbledBGH.yml')
+
+        except Exception as e:
+            log.error("Exception trapped: %s", e)
+            self.fail("Sample timeout.")
