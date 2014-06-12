@@ -24,80 +24,39 @@ from mi.core.exceptions import SampleException, DatasetParserException
 
 from mi.dataset.parser.wfp_c_file_common import WfpCFileCommonParser, WfpMetadataParserDataParticleKey
 from mi.dataset.parser.wfp_c_file_common import DATA_RECORD_BYTES, TIME_RECORD_BYTES
-
-
-class DataParticleType(BaseEnum):
-    DATA = 'ctdpf_ckl_wfp_instrument'
-    METADATA = 'ctdpf_ckl_wfp_metadata'
-
-
-class CtdpfCklWfpDataParticleKey(BaseEnum):
-    CONDUCTIVITY = 'conductivity'
-    TEMPERATURE = 'temperature'
-    PRESSURE = 'pressure'
-
-
-class CtdpfCklWfpDataParticle(DataParticle):
-    """
-    Class for parsing data from the ctdpf_ckl_wfp data set
-    """
-
-    _data_particle_type = DataParticleType.DATA
-
-    def _build_parsed_values(self):
-        """
-        Take something in the data format and turn it into
-        an array of dictionaries defining the data in the particle
-        with the appropriate tag.
-        @throws SampleException If there is a problem with sample creation
-        """
-        if len(self.raw_data) != DATA_RECORD_BYTES:
-            raise SampleException("CtdpfCklWfpDataParticle: Received unexpected number of bytes %d"
-                                  % len(self.raw_data))
-
-        fields = struct.unpack('>I', '\x00' + self.raw_data[0:3]) + \
-                 struct.unpack('>I', '\x00' + self.raw_data[3:6]) + \
-                 struct.unpack('>I', '\x00' + self.raw_data[6:9])
-
-        result = [self._encode_value(CtdpfCklWfpDataParticleKey.CONDUCTIVITY, fields[0], int),
-                  self._encode_value(CtdpfCklWfpDataParticleKey.TEMPERATURE, fields[1], int),
-                  self._encode_value(CtdpfCklWfpDataParticleKey.PRESSURE, fields[2], int)]
-
-        return result
-
-
-class CtdpfCklWfpMetadataParticle(DataParticle):
-    """
-    Class for creating the data particle for the common wfp metadata
-    """
-    _data_particle_type = DataParticleType.METADATA
-
-    def _build_parsed_values(self):
-        """
-        Take something in the data format and turn it into
-        an array of dictionaries defining the data in the particle
-        with the appropriate tag.
-        @throws SampleException If there is a problem with sample creation
-        """
-        if len(self.raw_data[0]) != TIME_RECORD_BYTES:
-            raise SampleException("CtdpfCklWfpMetadataDataParticle: Received unexpected number of bytes %d" % len(self.raw_data[0]))
-        # data is passed in as a tuple, first element is the two timestamps as a binary string
-        # the second is the number of samples as an float
-        timefields = struct.unpack('>II', self.raw_data[0])
-
-        number_samples = self.raw_data[1]
-
-        result = [self._encode_value(WfpMetadataParserDataParticleKey.WFP_TIME_ON, timefields[0], int),
-                  self._encode_value(WfpMetadataParserDataParticleKey.WFP_TIME_OFF, timefields[1], int),
-                  self._encode_value(WfpMetadataParserDataParticleKey.WFP_NUMBER_SAMPLES, number_samples, int)
-                  ]
-        return result
+from mi.dataset.parser.ctdpf_ckl_wfp_particles import CtdpfCklWfpRecoveredDataParticle
+from mi.dataset.parser.ctdpf_ckl_wfp_particles import CtdpfCklWfpTelemeteredDataParticle
+from mi.dataset.parser.ctdpf_ckl_wfp_particles import CtdpfCklWfpRecoveredMetadataParticle
+from mi.dataset.parser.ctdpf_ckl_wfp_particles import CtdpfCklWfpTelemeteredMetadataParticle
+from mi.dataset.parser.ctdpf_ckl_wfp_particles import DataParticleType
+from mi.dataset.parser.ctdpf_ckl_wfp_particles import CtdpfCklWfpDataParticleKey
 
 
 class CtdpfCklWfpParser(WfpCFileCommonParser):
-    """
-    Make use of the common wfp C file type parser
-    """
+
+    def __init__(self,
+                 config,
+                 state,
+                 stream_handle,
+                 state_callback,
+                 publish_callback,
+                 exception_callback,
+                 filesize,
+                 *args, **kwargs):
+
+#        log.info(config)
+        particle_classes_dict = config.get('particle_classes_dict')
+        self._instrument_data_particle_class = particle_classes_dict.get('instrument_data_particle_class')
+        self._metadata_particle_class = particle_classes_dict.get('metadata_particle_class')
+
+        super(CtdpfCklWfpParser, self).__init__(config,
+                                                state,
+                                                stream_handle,
+                                                state_callback,
+                                                publish_callback,
+                                                exception_callback,
+                                                filesize,
+                                                *args, **kwargs)
 
     def extract_metadata_particle(self, raw_data, timestamp):
         """
@@ -105,8 +64,7 @@ class CtdpfCklWfpParser(WfpCFileCommonParser):
         @param raw_data raw data to parse, in this case a tuple of the time string to parse and the number of records
         @param timestamp timestamp in NTP64
         """
-        sample = self._extract_sample(CtdpfCklWfpMetadataParticle, None,
-                                     raw_data, timestamp)
+        sample = self._extract_sample(self._metadata_particle_class, None, raw_data, timestamp)
         return sample
 
     def extract_data_particle(self, raw_data, timestamp):
@@ -115,5 +73,5 @@ class CtdpfCklWfpParser(WfpCFileCommonParser):
         @param raw_data the raw data to parse
         @param timestamp the timestamp in NTP64
         """
-        sample = self._extract_sample(CtdpfCklWfpDataParticle, None, raw_data, timestamp)
+        sample = self._extract_sample(self._instrument_data_particle_class, None, raw_data, timestamp)
         return sample
