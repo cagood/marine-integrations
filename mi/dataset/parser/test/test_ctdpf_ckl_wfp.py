@@ -21,7 +21,7 @@ from mi.idk.config import Config
 
 from mi.dataset.test.test_parser import ParserUnitTestCase
 from mi.dataset.dataset_driver import DataSetDriverConfigKeys
-from mi.dataset.parser.ctdpf_ckl_wfp import CtdpfCklWfpParser, DataParticleType
+from mi.dataset.parser.ctdpf_ckl_wfp import CtdpfCklWfpParser
 from mi.dataset.parser.ctdpf_ckl_wfp_particles import CtdpfCklWfpRecoveredDataParticle
 from mi.dataset.parser.ctdpf_ckl_wfp_particles import CtdpfCklWfpTelemeteredDataParticle
 from mi.dataset.parser.ctdpf_ckl_wfp_particles import CtdpfCklWfpRecoveredMetadataParticle
@@ -217,11 +217,11 @@ class CtdpfCklWfpParserUnitTestCase(ParserUnitTestCase):
         telemetered_result = self.telemetered_parser.get_records(1)
         self.assert_result(telemetered_result, 0, self.particle_meta, False, 0, True)
         telemetered_result = self.parser.get_records(1)
-        self.assert_result(telemetered_result, 11, self.telemetered_particle_a, False, 1, True)
+        self.assert_result(telemetered_result, 11, self.particle_a, False, 1, True)
         telemetered_result = self.parser.get_records(1)
-        self.assert_result(telemetered_result, 22, self.telemetered_particle_b, False, 2, True)
+        self.assert_result(telemetered_result, 22, self.particle_b, False, 2, True)
         telemetered_result = self.parser.get_records(1)
-        self.assert_result(telemetered_result, 33, self.telemetered_particle_c, True, 3, True)
+        self.assert_result(telemetered_result, 33, self.particle_c, True, 3, True)
 
         # no data left, dont move the position
         telemetered_result = self.telemetered_parser.get_records(1)
@@ -229,7 +229,7 @@ class CtdpfCklWfpParserUnitTestCase(ParserUnitTestCase):
         self.assertEqual(self.telemetered_parser._state[StateKey.POSITION], 33)
         self.assertEqual(self.state_callback_value[StateKey.POSITION], 33)
         self.assert_(isinstance(self.publish_callback_value, list))
-        self.assertEqual(self.publish_callback_value[0], self.telemetered_particle_c)
+        self.assertEqual(self.publish_callback_value[0], self.particle_c)
 
     def test_simple_pad(self):
         """
@@ -279,11 +279,11 @@ class CtdpfCklWfpParserUnitTestCase(ParserUnitTestCase):
         telemetered_result = self.telemetered_parser.get_records(1)
         self.assert_result(telemetered_result, 0, self.particle_meta, False, 0, True)
         telemetered_result = self.parser.get_records(1)
-        self.assert_result(telemetered_result, 11, self.telemetered_particle_a, False, 1, True)
+        self.assert_result(telemetered_result, 11, self.particle_a, False, 1, True)
         telemetered_result = self.parser.get_records(1)
-        self.assert_result(telemetered_result, 22, self.telemetered_particle_b, False, 2, True)
+        self.assert_result(telemetered_result, 22, self.particle_b, False, 2, True)
         telemetered_result = self.parser.get_records(1)
-        self.assert_result(telemetered_result, 33, self.telemetered_particle_c, True, 3, True)
+        self.assert_result(telemetered_result, 33, self.particle_c, True, 3, True)
 
         # no data left, dont move the position
         telemetered_result = self.telemetered_parser.get_records(1)
@@ -291,7 +291,7 @@ class CtdpfCklWfpParserUnitTestCase(ParserUnitTestCase):
         self.assertEqual(self.telemetered_parser._state[StateKey.POSITION], 33)
         self.assertEqual(self.state_callback_value[StateKey.POSITION], 33)
         self.assert_(isinstance(self.publish_callback_value, list))
-        self.assertEqual(self.publish_callback_value[0], self.telemetered_particle_c)
+        self.assertEqual(self.publish_callback_value[0], self.particle_c)
 
     def test_get_many(self):
         """
@@ -333,14 +333,14 @@ class CtdpfCklWfpParserUnitTestCase(ParserUnitTestCase):
         self.parser = self.telemetered_parser
         # next get records
         telemetered_result = self.telemetered_parser.get_records(4)
-        self.assertEqual(telemetered_result, [self.particle_meta, self.telemetered_particle_a,
-                                            self.telemetered_particle_b, self.telemetered_particle_c])
+        self.assertEqual(telemetered_result, [self.particle_meta, self.particle_a,
+                                            self.particle_b, self.particle_c])
         self.assertEqual(self.telemetered_parser._state[StateKey.POSITION], 33)
         self.assertEqual(self.state_callback_value[StateKey.POSITION], 33)
         self.assertEqual(self.publish_callback_value[0], self.particle_meta)
-        self.assertEqual(self.publish_callback_value[1], self.telemetered_particle_a)
-        self.assertEqual(self.publish_callback_value[2], self.telemetered_particle_b)
-        self.assertEqual(self.publish_callback_value[3], self.telemetered_particle_c)
+        self.assertEqual(self.publish_callback_value[1], self.particle_a)
+        self.assertEqual(self.publish_callback_value[2], self.particle_b)
+        self.assertEqual(self.publish_callback_value[3], self.particle_c)
         self.assertEqual(self.file_ingested_value, True)
         self.assertEqual(self.telemetered_parser._state[StateKey.RECORDS_READ], 3)
         self.assertEqual(self.state_callback_value[StateKey.RECORDS_READ], 3)
