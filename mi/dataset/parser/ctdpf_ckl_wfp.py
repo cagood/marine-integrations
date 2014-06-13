@@ -13,23 +13,11 @@ Initial Release
 __author__ = 'cgoodrich'
 __license__ = 'Apache 2.0'
 
-import re
-import struct
-
 from mi.core.log import get_logger
 log = get_logger()
-from mi.core.common import BaseEnum
-from mi.core.instrument.data_particle import DataParticle, DataParticleKey
-from mi.core.exceptions import SampleException, DatasetParserException
+
 
 from mi.dataset.parser.wfp_c_file_common import WfpCFileCommonParser, WfpMetadataParserDataParticleKey
-from mi.dataset.parser.wfp_c_file_common import DATA_RECORD_BYTES, TIME_RECORD_BYTES
-from mi.dataset.parser.ctdpf_ckl_wfp_particles import CtdpfCklWfpRecoveredDataParticle
-from mi.dataset.parser.ctdpf_ckl_wfp_particles import CtdpfCklWfpTelemeteredDataParticle
-from mi.dataset.parser.ctdpf_ckl_wfp_particles import CtdpfCklWfpRecoveredMetadataParticle
-from mi.dataset.parser.ctdpf_ckl_wfp_particles import CtdpfCklWfpTelemeteredMetadataParticle
-from mi.dataset.parser.ctdpf_ckl_wfp_particles import DataParticleType
-from mi.dataset.parser.ctdpf_ckl_wfp_particles import CtdpfCklWfpDataParticleKey
 
 
 class CtdpfCklWfpParser(WfpCFileCommonParser):
